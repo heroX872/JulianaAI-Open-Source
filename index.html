@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>JulianaAI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -12,26 +12,31 @@
 
     <div id="sidebarMenu" class="sidebar">
         <div class="sidebar-header">
-            <h3>Menu</h3>
+            <span class="sidebar-logo">Juliana<span>AI</span></span>
             <button id="closeMenuBtn" class="close-btn">&times;</button>
         </div>
-        <ul class="menu-items">
-            <li><a href="#" id="newChatBtn" class="menu-link active">Nova Conversa</a></li>
-            <li><a href="#" class="menu-link">Histórico</a></li>
-            <li><a href="#" class="menu-link">Configurações</a></li>
-        </ul>
+        
+        <div class="sidebar-content">
+            <p class="sidebar-label">Principal</p>
+            <ul class="menu-items">
+                <li><a href="#" id="newChatBtn" class="menu-link active"><span>+</span> Nova Conversa</a></li>
+                <li><a href="#" class="menu-link"><span>🕒</span> Histórico</a></li>
+                <ul id="historyList" class="menu-items"></ul>
+            </ul>
+        </div>
+
+        <div class="sidebar-footer">
+            <p>© 2026 JulianaAI</p>
+        </div>
     </div>
     <div id="menuOverlay" class="overlay"></div>
 
     <header>
         <div class="header-content">
             <button id="menuBtn" class="hamburger-btn">&#9776;</button>
-            
-            <div id="logoContainer" class="logo-container visible">
+            <div id="logoContainer" class="logo-container">
                 <img src="img/logo.png" alt="JulianaAI" class="logo-img">
             </div>
-
-            <div id="chatTitle" class="chat-title hidden"></div>
         </div>
     </header>
 
@@ -39,8 +44,11 @@
         <div id="messages" class="messages"></div>
 
         <div class="input-area">
-            <textarea id="messageInput" placeholder="Digite algo..." rows="1"></textarea>
-            <button id="sendBtn">Enviar</button>
+            <div class="input-wrapper">
+                <textarea id="messageInput" placeholder="Digite algo..." rows="1"></textarea>
+                <button id="sendBtn">Enviar</button>
+            </div>
+            <p class="ai-warning">Juliana é uma AI, talvez pode cometer erros</p>
         </div>
     </main>
 

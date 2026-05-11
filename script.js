@@ -1,88 +1,296 @@
 document.addEventListener('DOMContentLoaded', () => {
+
     const messagesEl = document.getElementById('messages');
     const inputEl = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
-    const logoContainer = document.getElementById('logoContainer');
-    const chatTitle = document.getElementById('chatTitle');
+
     const sidebar = document.getElementById('sidebarMenu');
-    const overlay = document.getElementById('menuOverlay');
     const menuBtn = document.getElementById('menuBtn');
     const closeBtn = document.getElementById('closeMenuBtn');
-    const newChatBtn = document.getElementById('newChatBtn');
+    const overlay = document.getElementById('menuOverlay');
 
-    let history = [];
-    let isFirstMessage = true;
+    const logoContainer = document.getElementById('logoContainer');
 
-    // Controle da Sidebar
+    const historyList = document.getElementById('historyList');
+
+    let db;
+    let currentChatId = null;
+
+    // ======================
+    // TÍTULO
+    // ======================
+
+    const titleEl = document.createElement('div');
+
+    titleEl.id = 'chatTitle';
+
+    titleEl.style.position = 'absolute';
+    titleEl.style.left = '50%';
+    titleEl.style.transform = 'translateX(-50%)';
+    titleEl.style.fontSize = '1.5rem';
+    titleEl.style.fontWeight = '500';
+    titleEl.style.whiteSpace = 'nowrap';
+    titleEl.style.overflow = 'hidden';
+    titleEl.style.textOverflow = 'ellipsis';
+    titleEl.style.maxWidth = '70%';
+    titleEl.style.display = 'none';
+
+    document.querySelector('.header-content').appendChild(titleEl);
+
+    // ======================
+    // DATABASE
+    // ======================
+
+    const request = indexedDB.open('JulianaAI_DB', 2);
+
+    request.onupgradeneeded = (event) => {
+
+        db = event.target.result;
+
+        if (!db.objectStoreNames.contains('conversations')) {
+
+            db.createObjectStore('conversations', {
+                keyPath: 'id'
+            });
+        }
+    };
+
+    request.onsuccess = (event) => {
+
+        db = event.target.result;
+
+        loadHistory();
+
+        createNewConversation();
+    };
+
+    // ======================
+    // MENU
+    // ======================
+
     const toggleMenu = (show) => {
-        if(show) { sidebar.classList.add('open'); overlay.classList.add('visible'); }
-        else { sidebar.classList.remove('open'); overlay.classList.remove('visible'); }
+
+        if (show) {
+            sidebar.classList.add('open');
+            overlay.classList.add('visible');
+        } else {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('visible');
+        }
     };
 
     menuBtn.onclick = () => toggleMenu(true);
     closeBtn.onclick = () => toggleMenu(false);
     overlay.onclick = () => toggleMenu(false);
 
-    // Resetar para nova conversa
-    newChatBtn.onclick = (e) => {
-        e.preventDefault();
-        messagesEl.innerHTML = '';
-        history = [];
-        isFirstMessage = true;
-        chatTitle.classList.add('hidden');
-        chatTitle.classList.remove('visible');
-        logoContainer.classList.add('visible');
-        logoContainer.classList.remove('hidden');
-        toggleMenu(false);
-    };
+    // ======================
+    // CONVERSAS
+    // ======================
 
-    function generateTitle(text) {
-        const words = text.split(' ');
-        return words.length > 3 ? words.slice(0, 3).join(' ') + '...' : text;
+    function createNewConversation() {
+
+        currentChatId = Date.now().toString();
+
+        messagesEl.innerHTML = '';
+
+        logoContainer.style.display = 'block';
+        titleEl.style.display = 'none';
     }
 
-    async function sendMessage() {
-        const text = inputEl.value.trim();
-        if(!text) return;
+    function saveConversation() {
 
-        if (isFirstMessage) {
-            chatTitle.textContent = generateTitle(text);
-            logoContainer.classList.add('hidden');
-            logoContainer.classList.remove('visible');
-            chatTitle.classList.add('visible');
-            chatTitle.classList.remove('hidden');
-            isFirstMessage = false;
+        if (!db || !currentChatId) return;
+
+        const messages = [];
+
+        document.querySelectorAll('.msg').forEach(msg => {
+
+            messages.push({
+                role: msg.classList.contains('user') ? 'user' : 'assistant',
+                content: msg.querySelector('.msg-content').innerHTML
+            });
+        });
+
+        let title = 'Nova conversa';
+
+        const firstUser = document.querySelector('.msg.user .msg-content');
+
+        if (firstUser) {
+
+            title = firstUser.textContent.trim();
+
+            if (title.length > 25) {
+                title = title.substring(0, 25) + '...';
+            }
         }
+
+        const transaction = db.transaction(['conversations'], 'readwrite');
+
+        const store = transaction.objectStore('conversations');
+
+        store.put({
+            id: currentChatId,
+            title,
+            messages
+        });
+
+        loadHistory();
+    }
+
+    function loadHistory() {
+
+        historyList.innerHTML = '';
+
+        const transaction = db.transaction(['conversations'], 'readonly');
+
+        const store = transaction.objectStore('conversations');
+
+        const getAll = store.getAll();
+
+        getAll.onsuccess = () => {
+
+            const conversations = getAll.result.reverse();
+
+            conversations.forEach(chat => {
+
+                const li = document.createElement('li');
+
+                li.innerHTML = `
+                    <a href="#" class="menu-link">
+                        <span>💬</span>
+                        ${chat.title}
+                    </a>
+                `;
+
+                li.onclick = () => {
+                    loadConversation(chat.id);
+                    toggleMenu(false);
+                };
+
+                historyList.appendChild(li);
+            });
+        };
+    }
+
+    function loadConversation(id) {
+
+        currentChatId = id;
+
+        const transaction = db.transaction(['conversations'], 'readonly');
+
+        const store = transaction.objectStore('conversations');
+
+        const request = store.get(id);
+
+        request.onsuccess = () => {
+
+            const chat = request.result;
+
+            if (!chat) return;
+
+            messagesEl.innerHTML = '';
+
+            chat.messages.reverse().forEach(msg => {
+                addMessage(msg.role, msg.content, false);
+            });
+
+            titleEl.textContent = chat.title;
+
+            titleEl.style.display = 'block';
+
+            logoContainer.style.display = 'none';
+        };
+    }
+
+    // ======================
+    // MENSAGEM
+    // ======================
+
+    function addMessage(role, content, save = true) {
+
+        const msgDiv = document.createElement('div');
+
+        msgDiv.className = `msg ${role}`;
+
+        msgDiv.innerHTML = `
+            <div class="msg-content">${content}</div>
+        `;
+
+        messagesEl.prepend(msgDiv);
+
+        if (save) {
+            saveConversation();
+        }
+
+        updateHeader();
+    }
+
+    // ======================
+    // HEADER
+    // ======================
+
+    function updateHeader() {
+
+        const firstUserMsg = document.querySelector('.msg.user .msg-content');
+
+        if (!firstUserMsg) {
+
+            logoContainer.style.display = 'block';
+
+            titleEl.style.display = 'none';
+
+            return;
+        }
+
+        if (!titleEl.textContent) {
+
+            let text = firstUserMsg.textContent.trim();
+
+            if (text.length > 25) {
+                text = text.substring(0, 25) + '...';
+            }
+
+            titleEl.textContent = text;
+        }
+
+        titleEl.style.display = 'block';
+
+        logoContainer.style.display = 'none';
+    }
+
+    // ======================
+    // ENVIAR
+    // ======================
+
+    sendBtn.onclick = () => {
+
+        const text = inputEl.value.trim();
+
+        if (!text) return;
 
         addMessage('user', text);
-        history.push({role: 'user', content: text});
+
         inputEl.value = '';
 
-        const loadingDiv = addMessage('assistant', '...');
-        try {
-            const res = await fetch("/chat", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({history})
-            });
-            const data = await res.json();
-            loadingDiv.remove();
-            addMessage('assistant', data.reply);
-            history.push({role: 'assistant', content: data.reply});
-        } catch(e) { 
-            loadingDiv.textContent = "Erro de conexão."; 
-        }
-    }
+        setTimeout(() => {
 
-    sendBtn.onclick = sendMessage;
-    inputEl.onkeydown = (e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+            addMessage(
+                'assistant',
+                'deu algum erro na API, poderia verificar?'
+            );
 
-    function addMessage(role, content) {
-        const div = document.createElement('div');
-        div.className = `msg ${role}`;
-        div.innerHTML = `<div class="msg-content">${content}</div>`;
-        messagesEl.appendChild(div);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-        return div;
-    }
+        }, 600);
+    };
+
+    // ======================
+    // NOVA CONVERSA
+    // ======================
+
+    document.getElementById('newChatBtn').onclick = (e) => {
+
+        e.preventDefault();
+
+        createNewConversation();
+    };
+
 });
