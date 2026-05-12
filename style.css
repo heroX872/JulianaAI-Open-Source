@@ -96,7 +96,7 @@ body {
 header { background: #1e1e1e; padding: 10px 15px; border-bottom: 1px solid #333; }
 .header-content { display: flex; align-items: center; justify-content: space-between; height: 50px; position: relative; }
 .logo-container { position: absolute; left: 50%; transform: translateX(-50%); }
-.logo-img { height: 80px; width: auto; }
+.logo { height: 80px; width: auto; }
 
 .input-area { background: #1e1e1e; padding: 12px; border-top: 1px solid #333; width: 100%; text-align: center; }
 .input-wrapper { display: flex; align-items: center; gap: 10px; }

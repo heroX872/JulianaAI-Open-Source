@@ -61,7 +61,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadHistory();
 
-        createNewConversation();
+        const transaction = db.transaction(['conversations'], 'readonly');
+
+        const store = transaction.objectStore('conversations');
+
+        const getAll = store.getAll();
+
+        getAll.onsuccess = () => {
+
+            const conversations = getAll.result;
+
+            if (conversations.length > 0) {
+
+                const lastChat = conversations[conversations.length - 1];
+
+                loadConversation(lastChat.id);
+
+            } else {
+
+                createNewConversation();
+            }
+        };
+    };
+
+    request.onerror = () => {
+
+        console.error('Erro ao abrir IndexedDB');
     };
 
     // ======================
@@ -71,16 +96,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleMenu = (show) => {
 
         if (show) {
+
             sidebar.classList.add('open');
+
             overlay.classList.add('visible');
+
         } else {
+
             sidebar.classList.remove('open');
+
             overlay.classList.remove('visible');
         }
     };
 
     menuBtn.onclick = () => toggleMenu(true);
+
     closeBtn.onclick = () => toggleMenu(false);
+
     overlay.onclick = () => toggleMenu(false);
 
     // ======================
@@ -93,7 +125,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         messagesEl.innerHTML = '';
 
+        titleEl.textContent = '';
+
         logoContainer.style.display = 'block';
+
         titleEl.style.display = 'none';
     }
 
@@ -106,7 +141,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.msg').forEach(msg => {
 
             messages.push({
-                role: msg.classList.contains('user') ? 'user' : 'assistant',
+
+                role: msg.classList.contains('user')
+                    ? 'user'
+                    : 'assistant',
+
                 content: msg.querySelector('.msg-content').innerHTML
             });
         });
@@ -120,6 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
             title = firstUser.textContent.trim();
 
             if (title.length > 25) {
+
                 title = title.substring(0, 25) + '...';
             }
         }
@@ -134,7 +174,10 @@ document.addEventListener('DOMContentLoaded', () => {
             messages
         });
 
-        loadHistory();
+        transaction.oncomplete = () => {
+
+            loadHistory();
+        };
     }
 
     function loadHistory() {
@@ -149,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         getAll.onsuccess = () => {
 
-            const conversations = getAll.result.reverse();
+            const conversations = [...getAll.result].reverse();
 
             conversations.forEach(chat => {
 
@@ -163,7 +206,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
 
                 li.onclick = () => {
+
                     loadConversation(chat.id);
+
                     toggleMenu(false);
                 };
 
@@ -190,7 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             messagesEl.innerHTML = '';
 
-            chat.messages.reverse().forEach(msg => {
+            chat.messages.forEach(msg => {
+
                 addMessage(msg.role, msg.content, false);
             });
 
@@ -219,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messagesEl.prepend(msgDiv);
 
         if (save) {
+
             saveConversation();
         }
 
@@ -231,7 +278,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateHeader() {
 
-        const firstUserMsg = document.querySelector('.msg.user .msg-content');
+        const firstUserMsg =
+            document.querySelector('.msg.user .msg-content');
 
         if (!firstUserMsg) {
 
@@ -247,6 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let text = firstUserMsg.textContent.trim();
 
             if (text.length > 25) {
+
                 text = text.substring(0, 25) + '...';
             }
 
@@ -282,6 +331,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 600);
     };
 
+    // ENTER
+    inputEl.addEventListener('keydown', (e) => {
+
+        if (e.key === 'Enter' && !e.shiftKey) {
+
+            e.preventDefault();
+
+            sendBtn.click();
+        }
+    });
+
     // ======================
     // NOVA CONVERSA
     // ======================
@@ -291,6 +351,8 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
 
         createNewConversation();
+
+        toggleMenu(false);
     };
 
 });
