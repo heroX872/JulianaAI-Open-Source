@@ -73,7 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (conversations.length > 0) {
 
-                const lastChat = conversations[conversations.length - 1];
+                const lastChat =
+                    conversations[conversations.length - 1];
 
                 loadConversation(lastChat.id);
 
@@ -146,13 +147,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? 'user'
                     : 'assistant',
 
-                content: msg.querySelector('.msg-content').innerHTML
+                content:
+                    msg.querySelector('.msg-content').innerHTML
             });
         });
 
         let title = 'Nova conversa';
 
-        const firstUser = document.querySelector('.msg.user .msg-content');
+        const firstUser =
+            document.querySelector('.msg.user .msg-content');
 
         if (firstUser) {
 
@@ -164,9 +167,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        const transaction = db.transaction(['conversations'], 'readwrite');
+        const transaction =
+            db.transaction(['conversations'], 'readwrite');
 
-        const store = transaction.objectStore('conversations');
+        const store =
+            transaction.objectStore('conversations');
 
         store.put({
             id: currentChatId,
@@ -184,15 +189,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         historyList.innerHTML = '';
 
-        const transaction = db.transaction(['conversations'], 'readonly');
+        const transaction =
+            db.transaction(['conversations'], 'readonly');
 
-        const store = transaction.objectStore('conversations');
+        const store =
+            transaction.objectStore('conversations');
 
         const getAll = store.getAll();
 
         getAll.onsuccess = () => {
 
-            const conversations = [...getAll.result].reverse();
+            const conversations =
+                [...getAll.result].reverse();
 
             conversations.forEach(chat => {
 
@@ -221,9 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentChatId = id;
 
-        const transaction = db.transaction(['conversations'], 'readonly');
+        const transaction =
+            db.transaction(['conversations'], 'readonly');
 
-        const store = transaction.objectStore('conversations');
+        const store =
+            transaction.objectStore('conversations');
 
         const request = store.get(id);
 
@@ -235,10 +245,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             messagesEl.innerHTML = '';
 
-            chat.messages.forEach(msg => {
+            [...chat.messages]
+                .reverse()
+                .forEach(msg => {
 
-                addMessage(msg.role, msg.content, false);
-            });
+                    addMessage(
+                        msg.role,
+                        msg.content,
+                        false
+                    );
+                });
 
             titleEl.textContent = chat.title;
 
@@ -252,14 +268,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // MENSAGEM
     // ======================
 
-    function addMessage(role, content, save = true) {
+    function addMessage(
+        role,
+        content,
+        save = true
+    ) {
 
-        const msgDiv = document.createElement('div');
+        const msgDiv =
+            document.createElement('div');
 
         msgDiv.className = `msg ${role}`;
 
         msgDiv.innerHTML = `
-            <div class="msg-content">${content}</div>
+            <div class="msg-content">
+                ${content}
+            </div>
         `;
 
         messagesEl.prepend(msgDiv);
@@ -270,6 +293,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateHeader();
+
+        messagesEl.scrollTop = 0;
     }
 
     // ======================
@@ -279,7 +304,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateHeader() {
 
         const firstUserMsg =
-            document.querySelector('.msg.user .msg-content');
+            document.querySelector(
+                '.msg.user .msg-content'
+            );
 
         if (!firstUserMsg) {
 
@@ -292,11 +319,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!titleEl.textContent) {
 
-            let text = firstUserMsg.textContent.trim();
+            let text =
+                firstUserMsg.textContent.trim();
 
             if (text.length > 25) {
 
-                text = text.substring(0, 25) + '...';
+                text =
+                    text.substring(0, 25) + '...';
             }
 
             titleEl.textContent = text;
@@ -311,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ENVIAR
     // ======================
 
-    sendBtn.onclick = () => {
+    sendBtn.onclick = async () => {
 
         const text = inputEl.value.trim();
 
@@ -321,38 +350,88 @@ document.addEventListener('DOMContentLoaded', () => {
 
         inputEl.value = '';
 
-        setTimeout(() => {
+        try {
+
+            const response = await fetch(
+                'https://TEU-WORKER.workers.dev',
+                {
+                    method: 'POST',
+
+                    headers: {
+                        'Content-Type':
+                            'application/json'
+                    },
+
+                    body: JSON.stringify({
+                        message: text
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            console.log(data);
+
+            if (data.reply) {
+
+                addMessage(
+                    'assistant',
+                    data.reply
+                );
+
+            } else {
+
+                addMessage(
+                    'assistant',
+                    'Erro na resposta da API.'
+                );
+
+                console.error(data);
+            }
+
+        } catch (error) {
+
+            console.error(error);
 
             addMessage(
                 'assistant',
-                'deu algum erro na API, poderia verificar?'
+                'Erro ao conectar com o servidor.'
             );
-
-        }, 600);
+        }
     };
 
+    // ======================
     // ENTER
-    inputEl.addEventListener('keydown', (e) => {
+    // ======================
 
-        if (e.key === 'Enter' && !e.shiftKey) {
+    inputEl.addEventListener(
+        'keydown',
+        (e) => {
 
-            e.preventDefault();
+            if (
+                e.key === 'Enter' &&
+                !e.shiftKey
+            ) {
 
-            sendBtn.click();
+                e.preventDefault();
+
+                sendBtn.click();
+            }
         }
-    });
+    );
 
     // ======================
     // NOVA CONVERSA
     // ======================
 
-    document.getElementById('newChatBtn').onclick = (e) => {
+    document
+        .getElementById('newChatBtn')
+        .onclick = (e) => {
 
-        e.preventDefault();
+            e.preventDefault();
 
-        createNewConversation();
+            createNewConversation();
 
-        toggleMenu(false);
-    };
-
+            toggleMenu(false);
+        };
 });
