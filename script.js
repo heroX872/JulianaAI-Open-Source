@@ -1,177 +1,175 @@
 document.addEventListener('DOMContentLoaded', () => {
-
     const messagesEl = document.getElementById('messages');
     const inputEl = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
-
     const sidebar = document.getElementById('sidebarMenu');
     const menuBtn = document.getElementById('menuBtn');
     const closeBtn = document.getElementById('closeMenuBtn');
     const overlay = document.getElementById('menuOverlay');
-
     const logoContainer = document.getElementById('logoContainer');
-
     const historyList = document.getElementById('historyList');
 
     let db;
     let currentChatId = null;
 
-    // ======================
-    // TÍTULO
-    // ======================
-
+    // HEADER TITLE
     const titleEl = document.createElement('div');
-
     titleEl.id = 'chatTitle';
-
-    titleEl.style.position = 'absolute';
-    titleEl.style.left = '50%';
-    titleEl.style.transform = 'translateX(-50%)';
-    titleEl.style.fontSize = '1.5rem';
-    titleEl.style.fontWeight = '500';
-    titleEl.style.whiteSpace = 'nowrap';
-    titleEl.style.overflow = 'hidden';
-    titleEl.style.textOverflow = 'ellipsis';
-    titleEl.style.maxWidth = '70%';
-    titleEl.style.display = 'none';
-
+    titleEl.style.cssText = `
+        position:absolute;
+        left:50%;
+        transform:translateX(-50%);
+        font-size:1.1rem;
+        font-weight:500;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        max-width:60%;
+        display:none;
+    `;
     document.querySelector('.header-content').appendChild(titleEl);
 
-    // ======================
+    // AUTO RESIZE
+    inputEl.addEventListener('input', function () {
+        this.style.height = 'auto';
+        this.style.height = this.scrollHeight + 'px';
+    });
+
+    // =========================
     // DATABASE
-    // ======================
+    // =========================
 
     const request = indexedDB.open('JulianaAI_DB', 2);
 
-    request.onupgradeneeded = (event) => {
-
-        db = event.target.result;
+    request.onupgradeneeded = (e) => {
+        db = e.target.result;
 
         if (!db.objectStoreNames.contains('conversations')) {
-
             db.createObjectStore('conversations', {
                 keyPath: 'id'
             });
         }
     };
 
-    request.onsuccess = (event) => {
-
-        db = event.target.result;
+    request.onsuccess = (e) => {
+        db = e.target.result;
 
         loadHistory();
 
-        const transaction = db.transaction(['conversations'], 'readonly');
+        const tx = db.transaction(['conversations'], 'readonly');
+        const store = tx.objectStore('conversations');
 
-        const store = transaction.objectStore('conversations');
-
-        const getAll = store.getAll();
-
-        getAll.onsuccess = () => {
-
-            const conversations = getAll.result;
+        store.getAll().onsuccess = (ev) => {
+            const conversations = ev.target.result;
 
             if (conversations.length > 0) {
-
-                const lastChat =
-                    conversations[conversations.length - 1];
-
-                loadConversation(lastChat.id);
-
+                loadConversation(conversations[conversations.length - 1].id);
             } else {
-
                 createNewConversation();
             }
         };
     };
 
-    request.onerror = () => {
-
-        console.error('Erro ao abrir IndexedDB');
-    };
-
-    // ======================
+    // =========================
     // MENU
-    // ======================
+    // =========================
 
     const toggleMenu = (show) => {
-
-        if (show) {
-
-            sidebar.classList.add('open');
-
-            overlay.classList.add('visible');
-
-        } else {
-
-            sidebar.classList.remove('open');
-
-            overlay.classList.remove('visible');
-        }
+        sidebar.classList.toggle('open', show);
+        overlay.classList.toggle('visible', show);
     };
 
     menuBtn.onclick = () => toggleMenu(true);
-
     closeBtn.onclick = () => toggleMenu(false);
-
     overlay.onclick = () => toggleMenu(false);
 
-    // ======================
-    // CONVERSAS
-    // ======================
+    // =========================
+    // CHAT FUNCTIONS
+    // =========================
 
     function createNewConversation() {
-
         currentChatId = Date.now().toString();
 
         messagesEl.innerHTML = '';
 
         titleEl.textContent = '';
+        titleEl.style.display = 'none';
 
         logoContainer.style.display = 'block';
 
-        titleEl.style.display = 'none';
+        inputEl.style.height = 'auto';
+
+        saveConversation();
     }
 
-    function saveConversation() {
+    function addMessage(role, content, save = true) {
+        const msgDiv = document.createElement('div');
 
-        if (!db || !currentChatId) return;
+        msgDiv.className = `msg ${role}`;
 
+        msgDiv.innerHTML = `
+            <div class="msg-content">${content}</div>
+        `;
+
+        messagesEl.prepend(msgDiv);
+
+        updateHeader();
+
+        if (save) {
+            saveConversation();
+        }
+    }
+
+    function getConversationMessages() {
         const messages = [];
 
         document.querySelectorAll('.msg').forEach(msg => {
-
             messages.push({
-
                 role: msg.classList.contains('user')
                     ? 'user'
                     : 'assistant',
 
-                content:
-                    msg.querySelector('.msg-content').innerHTML
+                content: msg.querySelector('.msg-content').textContent
             });
         });
 
-        let title = 'Nova conversa';
+        return messages.reverse();
+    }
 
-        const firstUser =
-            document.querySelector('.msg.user .msg-content');
+    function updateHeader() {
+        const firstUserMsg = document.querySelector('.msg.user .msg-content');
 
-        if (firstUser) {
-
-            title = firstUser.textContent.trim();
-
-            if (title.length > 25) {
-
-                title = title.substring(0, 25) + '...';
-            }
+        if (!firstUserMsg) {
+            logoContainer.style.display = 'block';
+            titleEl.style.display = 'none';
+            return;
         }
 
-        const transaction =
-            db.transaction(['conversations'], 'readwrite');
+        titleEl.textContent =
+            firstUserMsg.textContent.substring(0, 25) + '...';
 
-        const store =
-            transaction.objectStore('conversations');
+        titleEl.style.display = 'block';
+        logoContainer.style.display = 'none';
+    }
+
+    function saveConversation() {
+        if (!db || !currentChatId) return;
+
+        const messages = getConversationMessages();
+
+        let title = 'Nova conversa';
+
+        const firstUser = messages.find(m => m.role === 'user');
+
+        if (firstUser) {
+            title =
+                firstUser.content.substring(0, 25) +
+                (firstUser.content.length > 25 ? '...' : '');
+        }
+
+        const tx = db.transaction(['conversations'], 'readwrite');
+
+        const store = tx.objectStore('conversations');
 
         store.put({
             id: currentChatId,
@@ -179,44 +177,32 @@ document.addEventListener('DOMContentLoaded', () => {
             messages
         });
 
-        transaction.oncomplete = () => {
-
+        tx.oncomplete = () => {
             loadHistory();
         };
     }
 
     function loadHistory() {
-
         historyList.innerHTML = '';
 
-        const transaction =
-            db.transaction(['conversations'], 'readonly');
+        const tx = db.transaction(['conversations'], 'readonly');
 
-        const store =
-            transaction.objectStore('conversations');
+        const store = tx.objectStore('conversations');
 
-        const getAll = store.getAll();
-
-        getAll.onsuccess = () => {
-
-            const conversations =
-                [...getAll.result].reverse();
+        store.getAll().onsuccess = (e) => {
+            const conversations = [...e.target.result].reverse();
 
             conversations.forEach(chat => {
-
                 const li = document.createElement('li');
 
                 li.innerHTML = `
                     <a href="#" class="menu-link">
-                        <span>💬</span>
-                        ${chat.title}
+                        <span>💬</span>${chat.title}
                     </a>
                 `;
 
                 li.onclick = () => {
-
                     loadConversation(chat.id);
-
                     toggleMenu(false);
                 };
 
@@ -226,20 +212,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadConversation(id) {
-
         currentChatId = id;
 
-        const transaction =
-            db.transaction(['conversations'], 'readonly');
+        const tx = db.transaction(['conversations'], 'readonly');
 
-        const store =
-            transaction.objectStore('conversations');
+        const store = tx.objectStore('conversations');
 
-        const request = store.get(id);
-
-        request.onsuccess = () => {
-
-            const chat = request.result;
+        store.get(id).onsuccess = (e) => {
+            const chat = e.target.result;
 
             if (!chat) return;
 
@@ -248,12 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
             [...chat.messages]
                 .reverse()
                 .forEach(msg => {
-
-                    addMessage(
-                        msg.role,
-                        msg.content,
-                        false
-                    );
+                    addMessage(msg.role, msg.content, false);
                 });
 
             titleEl.textContent = chat.title;
@@ -264,84 +239,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // ======================
-    // MENSAGEM
-    // ======================
+    // =========================
+    // SEND MESSAGE
+    // =========================
 
-    function addMessage(
-        role,
-        content,
-        save = true
-    ) {
-
-        const msgDiv =
-            document.createElement('div');
-
-        msgDiv.className = `msg ${role}`;
-
-        msgDiv.innerHTML = `
-            <div class="msg-content">
-                ${content}
-            </div>
-        `;
-
-        messagesEl.prepend(msgDiv);
-
-        if (save) {
-
-            saveConversation();
-        }
-
-        updateHeader();
-
-        messagesEl.scrollTop = 0;
-    }
-
-    // ======================
-    // HEADER
-    // ======================
-
-    function updateHeader() {
-
-        const firstUserMsg =
-            document.querySelector(
-                '.msg.user .msg-content'
-            );
-
-        if (!firstUserMsg) {
-
-            logoContainer.style.display = 'block';
-
-            titleEl.style.display = 'none';
-
-            return;
-        }
-
-        if (!titleEl.textContent) {
-
-            let text =
-                firstUserMsg.textContent.trim();
-
-            if (text.length > 25) {
-
-                text =
-                    text.substring(0, 25) + '...';
-            }
-
-            titleEl.textContent = text;
-        }
-
-        titleEl.style.display = 'block';
-
-        logoContainer.style.display = 'none';
-    }
-
-    // ======================
-    // ENVIAR
-    // ======================
-
-    sendBtn.onclick = async () => {
-
+    async function sendMessage() {
         const text = inputEl.value.trim();
 
         if (!text) return;
@@ -349,89 +251,61 @@ document.addEventListener('DOMContentLoaded', () => {
         addMessage('user', text);
 
         inputEl.value = '';
+        inputEl.style.height = 'auto';
 
         try {
-
             const response = await fetch(
                 'https://TEU-WORKER.workers.dev',
                 {
                     method: 'POST',
 
                     headers: {
-                        'Content-Type':
-                            'application/json'
+                        'Content-Type': 'application/json'
                     },
 
                     body: JSON.stringify({
-                        message: text
+                        chatId: currentChatId,
+                        messages: getConversationMessages()
                     })
                 }
             );
 
             const data = await response.json();
 
-            console.log(data);
+            addMessage(
+                'assistant',
+                data.reply || 'Sem resposta.'
+            );
 
-            if (data.reply) {
+        } catch (err) {
 
-                addMessage(
-                    'assistant',
-                    data.reply
-                );
-
-            } else {
-
-                addMessage(
-                    'assistant',
-                    'Erro na resposta da API.'
-                );
-
-                console.error(data);
-            }
-
-        } catch (error) {
-
-            console.error(error);
+            console.error(err);
 
             addMessage(
                 'assistant',
-                'Erro ao conectar com o servidor.'
+                'Erro ao conectar ao servidor.'
             );
         }
-    };
+    }
 
-    // ======================
-    // ENTER
-    // ======================
+    sendBtn.onclick = sendMessage;
 
-    inputEl.addEventListener(
-        'keydown',
-        (e) => {
-
-            if (
-                e.key === 'Enter' &&
-                !e.shiftKey
-            ) {
-
-                e.preventDefault();
-
-                sendBtn.click();
-            }
-        }
-    );
-
-    // ======================
-    // NOVA CONVERSA
-    // ======================
-
-    document
-        .getElementById('newChatBtn')
-        .onclick = (e) => {
-
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
+            sendMessage();
+        }
+    });
 
-            createNewConversation();
+    // =========================
+    // NEW CHAT
+    // =========================
 
-            toggleMenu(false);
-        };
+    document.getElementById('newChatBtn').onclick = (e) => {
+        e.preventDefault();
+
+        createNewConversation();
+
+        toggleMenu(false);
+    };
 });
